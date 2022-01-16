@@ -1,0 +1,236 @@
+diff --git a/package/libs/wolfssl/Config.in b/package/libs/wolfssl/Config.in
+index b32d5ab6cb..f6fb844a4b 100644
+--- a/package/libs/wolfssl/Config.in
++++ b/package/libs/wolfssl/Config.in
+@@ -59,6 +59,15 @@ config WOLFSSL_ALT_NAMES
+ 	bool "Include SAN (Subject Alternative Name) support"
+ 	default y
+
++config WOLFSSL_HAS_SP
++	bool "Include Single Precision Math support"
++	default n
++
++config WOLFSSL_HAS_SP_ASM
++	bool "Include the assembly component of the SP math library"
++	depends on WOLFSSL_HAS_SP
++	default n
++
+ config WOLFSSL_HAS_DEVCRYPTO
+ 	bool
+
+@@ -72,6 +81,9 @@ choice
+ 	config WOLFSSL_HAS_AFALG
+ 		bool "AF_ALG"
+
++	config WOLFSSL_HAS_ARMASM
++		bool "ARMv8 Hardware Acceleration"
++
+ 	config WOLFSSL_HAS_DEVCRYPTO_CBC
+ 		bool "/dev/crytpo - AES-CBC-only"
+ 		select WOLFSSL_HAS_DEVCRYPTO
+diff --git a/package/libs/wolfssl/Makefile b/package/libs/wolfssl/Makefile
+index 15cfd430eb..8957020e64 100644
+--- a/package/libs/wolfssl/Makefile
++++ b/package/libs/wolfssl/Makefile
+@@ -8,12 +8,12 @@
+ include $(TOPDIR)/rules.mk
+
+ PKG_NAME:=wolfssl
+-PKG_VERSION:=4.8.1-stable
++PKG_VERSION:=5.0.0-stable
+ PKG_RELEASE:=$(AUTORELEASE)
+
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+ PKG_SOURCE_URL:=https://github.com/wolfSSL/wolfssl/archive/v$(PKG_VERSION)
+-PKG_HASH:=50db45f348f47e00c93dd244c24108220120cb3cc9d01434789229c32937c444
++PKG_HASH:=908390282cc613a3943533f3d922b3c18dee3289f498b6f944cb86a19a5eeb56
+
+ PKG_FIXUP:=libtool libtool-abiver
+ PKG_INSTALL:=1
+@@ -32,7 +32,9 @@ PKG_CONFIG_DEPENDS:=\
+ 	CONFIG_WOLFSSL_HAS_ECC25519 CONFIG_WOLFSSL_HAS_OCSP \
+ 	CONFIG_WOLFSSL_HAS_SESSION_TICKET CONFIG_WOLFSSL_HAS_TLSV10 \
+ 	CONFIG_WOLFSSL_HAS_TLSV13 CONFIG_WOLFSSL_HAS_WPAS CONFIG_WOLFSSL_HAS_CERTGEN \
+-	CONFIG_WOLFSSL_HAS_OPENVPN CONFIG_WOLFSSL_ALT_NAMES
++	CONFIG_WOLFSSL_HAS_OPENVPN CONFIG_WOLFSSL_ALT_NAMES \
++	CONFIG_WOLFSSL_HAS_OPENVPN CONFIG_WOLFSSL_HAS_ARMASM \
++	CONFIG_WOLFSSL_HAS_SP CONFIG_WOLFSSL_HAS_SP_ASM
+
+ PKG_ABI_VERSION=$(patsubst %-stable,%,$(PKG_VERSION)).$(call version_abbrev,$(call confvar,$(PKG_CONFIG_DEPENDS)))
+
+@@ -93,7 +95,10 @@ CONFIGURE_ARGS += \
+ 	--$(if $(CONFIG_WOLFSSL_HAS_DTLS),enable,disable)-dtls \
+ 	--$(if $(CONFIG_WOLFSSL_HAS_ECC25519),enable,disable)-curve25519 \
+ 	--$(if $(CONFIG_WOLFSSL_HAS_AFALG),enable,disable)-afalg \
++	--$(if $(CONFIG_WOLFSSL_HAS_ARMASM),enable,disable)-armasm \
+ 	--$(if $(CONFIG_WOLFSSL_HAS_OPENVPN),enable,disable)-openvpn \
++	--$(if $(CONFIG_WOLFSSL_HAS_SP),enable,disable)-sp \
++	--$(if $(CONFIG_WOLFSSL_HAS_SP_ASM),enable,disable)-sp-asm \
+ 	--enable-devcrypto=$(if $(CONFIG_WOLFSSL_HAS_DEVCRYPTO_CBC),cbc\
+ 			  ,$(if $(CONFIG_WOLFSSL_HAS_DEVCRYPTO_AES),aes\
+ 			  ,$(if $(CONFIG_WOLFSSL_HAS_DEVCRYPTO_FULL),yes,no)))
+diff --git a/package/libs/wolfssl/patches/001-Maths-x86-asm-change-asm-snippets-to-get-compiling.patch b/package/libs/wolfssl/patches/001-Maths-x86-asm-change-asm-snippets-to-get-compiling.patch
+deleted file mode 100644
+index 763f9e8d06..0000000000
+--- a/package/libs/wolfssl/patches/001-Maths-x86-asm-change-asm-snippets-to-get-compiling.patch
++++ /dev/null
+@@ -1,116 +0,0 @@
+-From fa8f23284d4689c2a737204b337b58d966dcbd8c Mon Sep 17 00:00:00 2001
+-From: Sean Parkinson <sean@wolfssl.com>
+-Date: Fri, 20 Aug 2021 10:23:38 +1000
+-Subject: [PATCH] Maths x86 asm: change asm snippets to get compiling
+-
+-TFM:
+-  Use register or memory for c0, c1, c2 in SQRADD and SQRADD2.
+-SP:
+-  Use register or memory for vl, vh, vo in SP_ASM_MUL_ADD,
+-SP_ASM_MUL_ADD2 and SP_ASM_SQR_ADD.
+----
+- wolfcrypt/src/asm.c    | 29 ++++++++++++++++++++---------
+- wolfcrypt/src/sp_int.c |  6 +++---
+- 2 files changed, 23 insertions(+), 12 deletions(-)
+-
+---- a/wolfcrypt/src/asm.c
+-+++ b/wolfcrypt/src/asm.c
+-@@ -698,33 +698,39 @@ __asm__(                             \
+- 
+- #define SQRADD(i, j)                                      \
+- __asm__(                                                  \
+--     "movl  %6,%%eax     \n\t"                            \
+-+     "movl  %3,%%eax     \n\t"                            \
+-      "mull  %%eax        \n\t"                            \
+-      "addl  %%eax,%0     \n\t"                            \
+-      "adcl  %%edx,%1     \n\t"                            \
+-      "adcl  $0,%2        \n\t"                            \
+--     :"=r"(c0), "=r"(c1), "=r"(c2): "0"(c0), "1"(c1), "2"(c2), "m"(i) :"%eax","%edx","cc");
+-+     :"+rm"(c0), "+rm"(c1), "+rm"(c2)                     \
+-+     : "m"(i)                                             \
+-+     :"%eax","%edx","cc");
+- 
+- #define SQRADD2(i, j)                                     \
+- __asm__(                                                  \
+--     "movl  %6,%%eax     \n\t"                            \
+--     "mull  %7           \n\t"                            \
+-+     "movl  %3,%%eax     \n\t"                            \
+-+     "mull  %4           \n\t"                            \
+-      "addl  %%eax,%0     \n\t"                            \
+-      "adcl  %%edx,%1     \n\t"                            \
+-      "adcl  $0,%2        \n\t"                            \
+-      "addl  %%eax,%0     \n\t"                            \
+-      "adcl  %%edx,%1     \n\t"                            \
+-      "adcl  $0,%2        \n\t"                            \
+--     :"=r"(c0), "=r"(c1), "=r"(c2): "0"(c0), "1"(c1), "2"(c2), "m"(i), "m"(j)  :"%eax","%edx", "cc");
+-+     :"+rm"(c0), "+rm"(c1), "+rm"(c2)                     \
+-+     : "m"(i), "m"(j)                                     \
+-+     :"%eax","%edx", "cc");
+- 
+- #define SQRADDSC(i, j)                                    \
+--__asm__(                                                     \
+-+__asm__(                                                  \
+-      "movl  %3,%%eax     \n\t"                            \
+-      "mull  %4           \n\t"                            \
+-      "movl  %%eax,%0     \n\t"                            \
+-      "movl  %%edx,%1     \n\t"                            \
+-      "xorl  %2,%2        \n\t"                            \
+--     :"=r"(sc0), "=r"(sc1), "=r"(sc2): "g"(i), "g"(j) :"%eax","%edx","cc");
+-+     :"=r"(sc0), "=r"(sc1), "=r"(sc2)                     \
+-+     : "g"(i), "g"(j)                                     \
+-+     :"%eax","%edx","cc");
+- 
+- #define SQRADDAC(i, j)                                    \
+- __asm__(                                                  \
+-@@ -733,7 +739,9 @@ __asm__(
+-      "addl  %%eax,%0     \n\t"                            \
+-      "adcl  %%edx,%1     \n\t"                            \
+-      "adcl  $0,%2        \n\t"                            \
+--     :"=r"(sc0), "=r"(sc1), "=r"(sc2): "0"(sc0), "1"(sc1), "2"(sc2), "g"(i), "g"(j) :"%eax","%edx","cc");
+-+     :"=r"(sc0), "=r"(sc1), "=r"(sc2)                     \
+-+     : "0"(sc0), "1"(sc1), "2"(sc2), "g"(i), "g"(j)       \
+-+     :"%eax","%edx","cc");
+- 
+- #define SQRADDDB                                          \
+- __asm__(                                                  \
+-@@ -743,7 +751,10 @@ __asm__(
+-      "addl %6,%0         \n\t"                            \
+-      "adcl %7,%1         \n\t"                            \
+-      "adcl %8,%2         \n\t"                            \
+--     :"=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(sc0), "r"(sc1), "r"(sc2) : "cc");
+-+     :"=r"(c0), "=r"(c1), "=r"(c2)                        \
+-+     : "0"(c0), "1"(c1), "2"(c2), "r"(sc0), "r"(sc1),     \
+-+       "r"(sc2)                                           \
+-+     : "cc");
+- 
+- #elif defined(TFM_X86_64)
+- /* x86-64 optimized */
+---- a/wolfcrypt/src/sp_int.c
+-+++ b/wolfcrypt/src/sp_int.c
+-@@ -476,7 +476,7 @@ static WC_INLINE sp_int_digit sp_div_wor
+-         "addl	%%eax, %[l]	\n\t"                    \
+-         "adcl	%%edx, %[h]	\n\t"                    \
+-         "adcl	$0   , %[o]	\n\t"                    \
+--        : [l] "+r" (vl), [h] "+r" (vh), [o] "+r" (vo)    \
+-+        : [l] "+rm" (vl), [h] "+rm" (vh), [o] "+rm" (vo) \
+-         : [a] "r" (va), [b] "r" (vb)                     \
+-         : "eax", "edx", "cc"                             \
+-     )
+-@@ -502,7 +502,7 @@ static WC_INLINE sp_int_digit sp_div_wor
+-         "addl	%%eax, %[l]	\n\t"                    \
+-         "adcl	%%edx, %[h]	\n\t"                    \
+-         "adcl	$0   , %[o]	\n\t"                    \
+--        : [l] "+r" (vl), [h] "+r" (vh), [o] "+r" (vo)    \
+-+        : [l] "+rm" (vl), [h] "+rm" (vh), [o] "+rm" (vo) \
+-         : [a] "r" (va), [b] "r" (vb)                     \
+-         : "eax", "edx", "cc"                             \
+-     )
+-@@ -541,7 +541,7 @@ static WC_INLINE sp_int_digit sp_div_wor
+-         "addl	%%eax, %[l]	\n\t"                    \
+-         "adcl	%%edx, %[h]	\n\t"                    \
+-         "adcl	$0   , %[o]	\n\t"                    \
+--        : [l] "+r" (vl), [h] "+r" (vh), [o] "+r" (vo)    \
+-+        : [l] "+rm" (vl), [h] "+rm" (vh), [o] "+rm" (vo) \
+-         : [a] "m" (va)                                   \
+-         : "eax", "edx", "cc"                             \
+-     )
+diff --git a/package/libs/wolfssl/patches/002-Update-macro-guard-on-SHA256-transform-call.patch b/package/libs/wolfssl/patches/002-Update-macro-guard-on-SHA256-transform-call.patch
+deleted file mode 100644
+index f986b72798..0000000000
+--- a/package/libs/wolfssl/patches/002-Update-macro-guard-on-SHA256-transform-call.patch
++++ /dev/null
+@@ -1,22 +0,0 @@
+-From f447e4c1fa4c932c0286fa0331966756e243db81 Mon Sep 17 00:00:00 2001
+-From: JacobBarthelmeh <jacob@wolfssl.com>
+-Date: Fri, 17 Sep 2021 15:06:13 -0700
+-Subject: [PATCH] update macro guard on SHA256 transform call
+-
+----
+- src/ssl.c   | 3 ++-
+- tests/api.c | 3 ++-
+- 2 files changed, 4 insertions(+), 2 deletions(-)
+-
+---- a/src/ssl.c
+-+++ b/src/ssl.c
+-@@ -17639,7 +17639,8 @@ size_t wolfSSL_get_client_random(const W
+-     
+-     #if defined(OPENSSL_EXTRA)
+-     #if !defined(HAVE_SELFTEST) && (!defined(HAVE_FIPS) || \
+--        (defined(HAVE_FIPS_VERSION) && (HAVE_FIPS_VERSION > 2)))
+-+        (defined(HAVE_FIPS_VERSION) && (HAVE_FIPS_VERSION > 2))) && \
+-+        !defined(WOLFSSL_DEVCRYPTO_HASH) && !defined(WOLFSSL_AFALG_HASH)
+-     /* Apply SHA256 transformation to the data */
+-     int wolfSSL_SHA256_Transform(WOLFSSL_SHA256_CTX* sha256, 
+-                                                 const unsigned char* data)
+diff --git a/package/libs/ustream-ssl/patches/001-deprecated-ntru.patch b/package/libs/ustream-ssl/patches/001-deprecated-ntru.patch
+new file mode 100644
+--- /dev/null
++++ a/package/libs/ustream-ssl/patches/001-deprecated-ntru.patch
+@@ -0,0 +1,10 @@
++--- a/ustream-openssl.c
+++++ b/ustream-openssl.c
++@@ -308,7 +308,6 @@
++       case ASN_SIG_HASH_E:
++       case ASN_SIG_KEY_E:
++       case ASN_DH_KEY_E:
++-      case ASN_NTRU_KEY_E:
++       case ASN_CRIT_EXT_E:
++       case ASN_ALT_NAME_E:
++       case ASN_NO_PEM_HEADER:

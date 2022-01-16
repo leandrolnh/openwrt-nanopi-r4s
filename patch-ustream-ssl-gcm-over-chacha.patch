@@ -1,0 +1,90 @@
+diff --git a/package/libs/ustream-ssl/patches/002-prefer-gcm-over-chacha.patch b/package/libs/ustream-ssl/patches/002-prefer-gcm-over-chacha.patch
+new file mode 100644
+--- /dev/null
++++ package/libs/ustream-ssl/patches/002-prefer-gcm-over-chacha.patch
+@@ -0,0 +1,85 @@
++--- a/ustream-openssl.c
+++++ b/ustream-openssl.c
++@@ -28,62 +28,62 @@
++ /* Ciphersuite preference:
++  * - for server, no weak ciphers are used if you use an ECDSA key.
++  * - forward-secret (pfs), authenticated (AEAD) ciphers are at the top:
++- *   	chacha20-poly1305, the fastest in software, 256-bits
++- * 	aes128-gcm, 128-bits
++  * 	aes256-gcm, 256-bits
+++ * 	chacha20-poly1305, the fastest in software, 256-bits
+++ * 	aes128-gcm, 128-bits
++  * - key exchange: prefer ECDHE, then DHE (client only)
++  * - forward-secret ECDSA CBC ciphers (client-only)
++  * - forward-secret RSA CBC ciphers
++  * - non-pfs ciphers
++- *	aes128, aes256, 3DES(client only)
+++ * 	aes256, aes128, 3DES(client only)
++  */
++ 
++ #ifdef WOLFSSL_SSL_H
++ # define top_ciphers							\
+++				"TLS13-AES256-GCM-SHA384:"		\
++ 				"TLS13-CHACHA20-POLY1305-SHA256:"	\
++ 				"TLS13-AES128-GCM-SHA256:"		\
++-				"TLS13-AES256-GCM-SHA384:"		\
++ 				ecdhe_aead_ciphers
++ #else
++-# define tls13_ciphersuites	"TLS_CHACHA20_POLY1305_SHA256:"		\
++-				"TLS_AES_128_GCM_SHA256:"		\
++-				"TLS_AES_256_GCM_SHA384"
+++# define tls13_ciphersuites	"TLS_AES_256_GCM_SHA384:"		\
+++				"TLS_CHACHA20_POLY1305_SHA256:"		\
+++				"TLS_AES_128_GCM_SHA256"
++ 
++ # define top_ciphers							\
++ 				ecdhe_aead_ciphers
++ #endif
++ 
++ #define ecdhe_aead_ciphers						\
+++				"ECDHE-ECDSA-AES256-GCM-SHA384:"	\
++ 				"ECDHE-ECDSA-CHACHA20-POLY1305:"	\
++ 				"ECDHE-ECDSA-AES128-GCM-SHA256:"	\
++-				"ECDHE-ECDSA-AES256-GCM-SHA384:"	\
+++				"ECDHE-RSA-AES256-GCM-SHA384:"		\
++ 				"ECDHE-RSA-CHACHA20-POLY1305:"		\
++-				"ECDHE-RSA-AES128-GCM-SHA256:"		\
++-				"ECDHE-RSA-AES256-GCM-SHA384"
+++				"ECDHE-RSA-AES128-GCM-SHA256"
++ 
++ #define dhe_aead_ciphers						\
+++				"DHE-RSA-AES256-GCM-SHA384:"		\
++ 				"DHE-RSA-CHACHA20-POLY1305:"		\
++-				"DHE-RSA-AES128-GCM-SHA256:"		\
++-				"DHE-RSA-AES256-GCM-SHA384"
+++				"DHE-RSA-AES128-GCM-SHA256"
++ 
++ #define ecdhe_ecdsa_cbc_ciphers						\
++-				"ECDHE-ECDSA-AES128-SHA:"		\
++-				"ECDHE-ECDSA-AES256-SHA"
+++				"ECDHE-ECDSA-AES256-SHA:"		\
+++				"ECDHE-ECDSA-AES128-SHA"
++ 
++ #define ecdhe_rsa_cbc_ciphers						\
++-				"ECDHE-RSA-AES128-SHA:"			\
++-				"ECDHE-RSA-AES256-SHA"
+++				"ECDHE-RSA-AES256-SHA:"			\
+++				"ECDHE-RSA-AES128-SHA"
++ 
++ #define dhe_cbc_ciphers							\
++-				"DHE-RSA-AES128-SHA:"			\
++ 				"DHE-RSA-AES256-SHA:"			\
+++				"DHE-RSA-AES128-SHA:"			\
++ 				"DHE-DES-CBC3-SHA"
++ 
++ #define non_pfs_aes							\
++-				"AES128-GCM-SHA256:"			\
++ 				"AES256-GCM-SHA384:"			\
++-				"AES128-SHA:"				\
++-				"AES256-SHA"
+++				"AES128-GCM-SHA256:"			\
+++				"AES256-SHA:"				\
+++				"AES128-SHA"
++ 
++ #define server_cipher_list						\
++ 				top_ciphers ":"				\

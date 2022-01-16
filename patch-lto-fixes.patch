@@ -1,0 +1,66 @@
+diff --git a/package/libs/elfutils/Makefile b/package/libs/elfutils/Makefile
+index b0c9b8bd8c..3605593ab1 100644
+--- a/package/libs/elfutils/Makefile
++++ b/package/libs/elfutils/Makefile
+@@ -74,7 +74,8 @@ CONFIGURE_ARGS += \
+ 	--without-lzma \
+ 	--without-zstd
+ 
+-TARGET_CFLAGS += -D_GNU_SOURCE -Wno-unused-result -Wno-format-nonliteral
++TARGET_CFLAGS += -D_GNU_SOURCE -Wno-unused-result -Wno-format-nonliteral \
++	-Wno-stack-usage -Wno-null-dereference
+ 
+ define Build/InstallDev
+ 	$(INSTALL_DIR) $(1)/usr/include
+diff --git a/package/network/config/firewall/Makefile b/package/network/config/firewall/Makefile
+index 378a912f9d..2b179d2316 100644
+--- a/package/network/config/firewall/Makefile
++++ b/package/network/config/firewall/Makefile
+@@ -40,7 +40,7 @@ define Package/firewall/conffiles
+ /etc/firewall.user
+ endef
+ 
+-TARGET_CFLAGS += -ffunction-sections -fdata-sections -flto
++TARGET_CFLAGS += -ffunction-sections -fdata-sections -flto -Wno-format-overflow
+ TARGET_LDFLAGS += -Wl,--gc-sections -flto
+ CMAKE_OPTIONS += $(if $(CONFIG_IPV6),,-DDISABLE_IPV6=1)
+ 
+diff --git a/package/system/procd/Makefile b/package/system/procd/Makefile
+index 0f0df8c68d..1a3bed4b59 100644
+--- a/package/system/procd/Makefile
++++ b/package/system/procd/Makefile
+@@ -38,7 +38,7 @@ endif
+ CMAKE_OPTIONS += -DEARLY_PATH="$(TARGET_INIT_PATH)"
+ TARGET_LDFLAGS += $(if $(CONFIG_USE_GLIBC),-lrt)
+ 
+-TARGET_CFLAGS += -flto
++TARGET_CFLAGS += -flto -Wno-array-bounds -Wno-format-truncation -Wno-maybe-uninitialized
+ TARGET_LDFLAGS += -flto
+ 
+ define Package/procd/Default
+diff --git a/toolchain/musl/common.mk b/toolchain/musl/common.mk
+index 0f42a9eb60..cafe70ae24 100644
+--- a/toolchain/musl/common.mk
++++ b/toolchain/musl/common.mk
+@@ -25,7 +25,7 @@ HOST_BUILD_DIR:=$(BUILD_DIR_TOOLCHAIN)/$(PKG_NAME)-$(PKG_VERSION)
+ include $(INCLUDE_DIR)/host-build.mk
+ include $(INCLUDE_DIR)/hardening.mk
+
+-TARGET_CFLAGS:= $(filter-out -O%,$(TARGET_CFLAGS))
++TARGET_CFLAGS:= $(filter-out -fipa-pta -fdevirtualize-at-ltrans -fuse-linker-plugin -ffat-lto-objects -flto%,$(TARGET_CFLAGS))
+ TARGET_CFLAGS+= $(if $(CONFIG_MUSL_DISABLE_CRYPT_SIZE_HACK),,-DCRYPT_SIZE_HACK)
+
+ MUSL_CONFIGURE:= \
+diff --git a/toolchain/gcc/common.mk b/toolchain/gcc/common.mk
+index a195002888..114ea274a4 100644
+--- a/toolchain/gcc/common.mk
++++ b/toolchain/gcc/common.mk
+@@ -49,6 +49,8 @@ HOST_BUILD_PARALLEL:=1
+
+ include $(INCLUDE_DIR)/toolchain-build.mk
+
++TARGET_CFLAGS:=$(filter-out -fipa-pta -fdevirtualize-at-ltrans -fuse-linker-plugin -ffat-lto-objects -flto%,$(TARGET_CFLAGS))
++
+ HOST_SOURCE_DIR:=$(HOST_BUILD_DIR)
+ ifeq ($(GCC_VARIANT),minimal)
+   GCC_BUILD_DIR:=$(HOST_BUILD_DIR)-$(GCC_VARIANT)

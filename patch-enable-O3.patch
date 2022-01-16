@@ -1,0 +1,32 @@
+diff --git a/config/Config-kernel.in b/config/Config-kernel.in
+index 07d65bc465..a0d80be235 100644
+--- a/config/Config-kernel.in
++++ b/config/Config-kernel.in
+@@ -1180,6 +1180,12 @@ config KERNEL_CC_OPTIMIZE_FOR_PERFORMANCE
+ 	  with the "-O2" compiler flag for best performance and most
+ 	  helpful compile-time warnings.
+ 
++config KERNEL_CC_OPTIMIZE_FOR_PERFORMANCE_O3
++	bool "Optimize for more performance (-O3)"
++	help
++	  Choosing this option will pass "-O3" to your compiler to optimize
++	  the kernel yet more for performance.
++
+ config KERNEL_CC_OPTIMIZE_FOR_SIZE
+ 	bool "Optimize for size"
+ 	help
+diff --git a/target/linux/generic/pending-5.10/200-enable_o3.patch b/target/linux/generic/pending-5.10/200-enable_o3.patch
+new file mode 100644
+--- /dev/null
++++ a/target/linux/generic/pending-5.10/200-enable_o3.patch
+@@ -0,0 +1,10 @@
++--- a/init/Kconfig
+++++ b/init/Kconfig
++@@ -1253,7 +1253,6 @@
++
++ config CC_OPTIMIZE_FOR_PERFORMANCE_O3
++ 	bool "Optimize more for performance (-O3)"
++-	depends on ARC
++ 	help
++ 	  Choosing this option will pass "-O3" to your compiler to optimize
++ 	  the kernel yet more for performance.
