@@ -1,0 +1,20 @@
+diff --git a/package/network/config/netifd/files/etc/hotplug.d/net/20-smp-packet-steering b/package/network/config/netifd/files/etc/hotplug.d/net/20-smp-packet-steering
+index 8a86bf75f6..96278856b0 100644
+--- a/package/network/config/netifd/files/etc/hotplug.d/net/20-smp-packet-steering
++++ b/package/network/config/netifd/files/etc/hotplug.d/net/20-smp-packet-steering
+@@ -4,7 +4,14 @@
+ NPROCS="$(grep -c "^processor.*:" /proc/cpuinfo)"
+ [ "$NPROCS" -gt 1 ] || exit
+ 
+-PROC_MASK="$(( (1 << $NPROCS) - 1 ))"
++case "$(board_name)" in
++friendlyarm,nanopi-r4s)
++	PROC_MASK="15"
++	;;
++*)
++	PROC_MASK="$(( (1 << $NPROCS) - 1 ))"
++	;;
++esac
+ 
+ find_irq_cpu() {
+ 	local dev="$1"
