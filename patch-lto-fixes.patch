@@ -1,17 +1,30 @@
 diff --git a/package/libs/elfutils/Makefile b/package/libs/elfutils/Makefile
-index b0c9b8bd8c..3605593ab1 100644
+index 9aa78d8..92e9eaa 100644
 --- a/package/libs/elfutils/Makefile
 +++ b/package/libs/elfutils/Makefile
-@@ -74,7 +74,8 @@ CONFIGURE_ARGS += \
- 	--without-lzma \
- 	--without-zstd
- 
+@@ -80,7 +80,8 @@ HOST_CONFIGURE_VARS += \
+ CONFIGURE_VARS += \
+ 	ac_cv_search__obstack_free=yes
+
 -TARGET_CFLAGS += -D_GNU_SOURCE -Wno-unused-result -Wno-format-nonliteral
 +TARGET_CFLAGS += -D_GNU_SOURCE -Wno-unused-result -Wno-format-nonliteral \
 +	-Wno-stack-usage -Wno-null-dereference
- 
+
  define Build/InstallDev
  	$(INSTALL_DIR) $(1)/usr/include
+diff --git a/package/libs/mbedtls/Makefile b/package/libs/mbedtls/Makefile
+index 9c6c81d9c1..15e87a2d84 100644
+--- a/package/libs/mbedtls/Makefile
++++ b/package/libs/mbedtls/Makefile
+@@ -87,7 +87,7 @@ This package contains mbedtls helper programs for private key and
+ CSR generation (gen_key, cert_req)
+ endef
+
+-TARGET_CFLAGS += -ffunction-sections -fdata-sections
++TARGET_CFLAGS += -ffunction-sections -fdata-sections -Wno-stringop-overflow
+ TARGET_CFLAGS := $(filter-out -O%,$(TARGET_CFLAGS))
+
+ CMAKE_OPTIONS += \
 diff --git a/package/network/config/firewall/Makefile b/package/network/config/firewall/Makefile
 index 378a912f9d..2b179d2316 100644
 --- a/package/network/config/firewall/Makefile
@@ -25,6 +38,18 @@ index 378a912f9d..2b179d2316 100644
  TARGET_LDFLAGS += -Wl,--gc-sections -flto
  CMAKE_OPTIONS += $(if $(CONFIG_IPV6),,-DDISABLE_IPV6=1)
  
+diff --git a/package/network/utils/bpftools/Makefile b/package/network/utils/bpftools/Makefile
+index f044cc81f8..c1e4d38910 100644
+--- a/package/network/utils/bpftools/Makefile
++++ b/package/network/utils/bpftools/Makefile
+@@ -88,6 +88,7 @@ endef
+
+
+ # LTO not compatible with DSO using PIC
++TARGET_CFLAGS := $(filter-out -flto%,$(TARGET_CFLAGS))
+ ifneq ($(BUILD_VARIANT),lib)
+   TARGET_CFLAGS += -ffunction-sections -fdata-sections -flto
+   TARGET_LDFLAGS += -Wl,--gc-sections
 diff --git a/package/system/procd/Makefile b/package/system/procd/Makefile
 index 0f0df8c68d..1a3bed4b59 100644
 --- a/package/system/procd/Makefile
