@@ -2,7 +2,7 @@ diff --git a/config/Config-kernel.in b/config/Config-kernel.in
 index 07d65bc465..a0d80be235 100644
 --- a/config/Config-kernel.in
 +++ b/config/Config-kernel.in
-@@ -1180,6 +1180,12 @@ config KERNEL_CC_OPTIMIZE_FOR_PERFORMANCE
+@@ -1210,6 +1210,12 @@ config KERNEL_CC_OPTIMIZE_FOR_PERFORMANCE
  	  with the "-O2" compiler flag for best performance and most
  	  helpful compile-time warnings.
  
