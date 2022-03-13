@@ -56,9 +56,7 @@ index 43cc8b05b7..8a72f3d012 100644
  config LIBMBEDTLS_HKDF_C
  	depends on PACKAGE_libmbedtls
  	bool "Enable the HKDF algorithm (RFC 5869)"
-@@ -92,6 +107,9 @@ PKG_INSTALL:=1
- 
- TARGET_CFLAGS += -ffunction-sections -fdata-sections
+@@ -92,4 +107,7 @@
  TARGET_CFLAGS := $(filter-out -O%,$(TARGET_CFLAGS))
 +ifneq ($(CONFIG_LIBMBEDTLS_HAVE_ARMV8CE_AES),)
 +  TARGET_CFLAGS := $(filter-out -march=%,$(TARGET_CFLAGS)) -march=armv8-a+crypto
@@ -442,8 +440,8 @@ index 0000000000..b6531181f0
 ++#endif
 ++
 +     /* pack h as two 64-bits ints, big-endian */
-+     GET_UINT32_BE( hi, h,  0  );
-+     GET_UINT32_BE( lo, h,  4  );
++     hi = MBEDTLS_GET_UINT32_BE( h,  0  );
++     lo = MBEDTLS_GET_UINT32_BE( h,  4  );
 +@@ -248,6 +258,11 @@
 +     unsigned char lo, hi, rem;
 +     uint64_t zh, zl;
@@ -459,14 +457,14 @@ index 0000000000..b6531181f0
 +diff -ruNa --binary a/library/Makefile b/library/Makefile
 +--- a/library/Makefile	2020-12-10 20:54:15.000000000 +0800
 ++++ b/library/Makefile	2021-03-07 15:12:49.277078224 +0800
-+@@ -65,6 +65,7 @@
-+ 
-+ OBJS_CRYPTO=	aes.o		aesni.o		arc4.o		\
-+ 		aria.o		asn1parse.o	asn1write.o	\
-++		armv8ce_aes.o					\
-+ 		base64.o	bignum.o	blowfish.o	\
-+ 		camellia.o	ccm.o		chacha20.o	\
-+ 		chachapoly.o	cipher.o	cipher_wrap.o	\
++@@ -74,6 +74,7 @@
++ 	     aria.o \
++ 	     asn1parse.o \
++ 	     asn1write.o \
+++	     armv8ce_aes.o \
++ 	     base64.o \
++ 	     bignum.o \
++ 	     blowfish.o \
 +diff -ruNa --binary a/library/version_features.c b/library/version_features.c
 +--- a/library/version_features.c	2020-12-10 20:54:15.000000000 +0800
 ++++ b/library/version_features.c	2021-03-07 15:06:45.625543309 +0800
